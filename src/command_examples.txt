@@ -1,0 +1,6 @@
+# Examples of command to run the AFs from the command line
+
+### LMS
+         \M (system order) \L (realizations) \N (iterations)  \mu   \var_v  
+./LMS    4                 1                 1000              0.01  1e-4    
+
