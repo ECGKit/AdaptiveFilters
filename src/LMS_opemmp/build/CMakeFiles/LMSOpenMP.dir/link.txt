@@ -1,0 +1,1 @@
+/usr/bin/c++    -Wall -std=c++11 -fopenmp -Wall -std=c++11 -O3 -DNDEBUG    CMakeFiles/LMSOpenMP.dir/main.cpp.o  -o LMSOpenMP -rdynamic -lboost_system 

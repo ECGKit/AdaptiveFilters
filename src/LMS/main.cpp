@@ -8,11 +8,14 @@
 #include "Eigen"
 #include "gnuplot-iostream.h"
 
+#include "timer.h"
+
 //using namespace std;
 using namespace Eigen;
 
 int main(int argc, char* argv[])
 {
+    StartTimer();
 
     double error, emse, msd;
     double MSE_theory = 0, EMSE_theory = 0;
@@ -60,7 +63,7 @@ int main(int argc, char* argv[])
     std::vector<double> MSE_avg;
     std::vector<double> EMSE_avg;
     std::vector<double> MSD_avg;
-	
+
     // Resizing the following vectors to allocate memory. Otherwise
     // a 'segmentation fault'
     MSE_avg.resize(iterations);
@@ -103,7 +106,7 @@ for (size_t i = 0; i < iterations; ++i)
         error = d - u_i.dot(w_old);
         emse = u_i.dot(wo_i - w_old);
         msd = (wo_i - w_old).norm();
-        
+
 	MSE.push_back(pow(error,2)); // .push_back shifts the previous content of the vector
         EMSE.push_back(pow(emse,2)); // .push_back shifts the previous content of the vector
       	MSD.push_back(pow(msd,2)); // .push_back shifts the previous content of the vector
@@ -160,7 +163,7 @@ for (size_t i = 0; i < iterations; ++i)
 
     MSE_theory  = var_v + mu*M*var_v/(2-mu*M);
     EMSE_theory = mu*M*var_v/(2-mu*M);
-	
+
     std::cout << "Number of taps = " << M << std::endl;
     std::cout << "Realizations = " << realizations << std::endl;
     std::cout << "Iterations = " << iterations << std::endl;
@@ -178,7 +181,7 @@ for (size_t i = 0; i < iterations; ++i)
     std::ofstream output_EMSE("./EMSE.out"); //saving EMSE vector
     std::ostream_iterator<double> output_iterator_EMSE(output_EMSE, "\n");
     std::copy(EMSE_avg.begin(), EMSE_avg.end(), output_iterator_EMSE);
-    
+
     std::ofstream output_MSD("./MSD.out"); //saving MSD vector
     std::ostream_iterator<double> output_iterator_MSD(output_MSD, "\n");
     std::copy(MSD_avg.begin(), MSD_avg.end(), output_iterator_MSD);
@@ -195,4 +198,5 @@ for (size_t i = 0; i < iterations; ++i)
        output_w << w_avg[n] << '\n'; // saves w_avg. Each line is an entry
     }
 
+    printf("Elapsed Time (ms) = %g\n", GetTimer());
 }
