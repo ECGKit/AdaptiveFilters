@@ -56,6 +56,12 @@ int main(int argc, char* argv[])
 
   Eigen::Matrix<double, Dynamic, 1> wo_i; //Array - plant model initialized with M zeros
                                     wo_i.setZero(M, 1);
+
+  for (int n=0; n < M; n++) //populating the arrays - regressor and noise
+  {
+    wo_i(n) = wo;
+  }
+
   // Eigen::Matrix<double, Dynamic, 1> w_avg; //Array - weight vector averaged over realizations
   Eigen::Matrix<double, Dynamic, 1> w_avg_final; //Array - weight vector averaged over realizations
                                     w_avg_final.setZero(M, 1);
@@ -67,6 +73,12 @@ int main(int argc, char* argv[])
                                           EMSE_avg.setZero(iterations, NUM_THREADS);
   Eigen::Matrix<double, Dynamic, Dynamic> MSD_avg; //MSD_avg
                                           MSD_avg.setZero(iterations, NUM_THREADS);
+  Eigen::Matrix<double, Dynamic, 1> MSE_avg_final; //MSE for ensemble average
+                                    MSE_avg_final.setZero(iterations, 1);
+  Eigen::Matrix<double, Dynamic, 1> EMSE_avg_final; //EMSE for ensemble average
+                                    EMSE_avg_final.setZero(iterations, 1);
+  Eigen::Matrix<double, Dynamic, 1> MSD_avg_final; //MSD for ensemble average
+                                    MSD_avg_final.setZero(iterations, 1);
 
   omp_set_num_threads(NUM_THREADS); //Requesting NUM_THREADS threads to the host
 
@@ -74,6 +86,8 @@ int main(int argc, char* argv[])
   {
     Eigen::Matrix<double, Dynamic, 1> u_i; //Regressor initialized with M zeros
                                       u_i.setZero(M, 1);
+    // Eigen::Matrix<double, Dynamic, 1> wo_i; //Array - plant model initialized with M zeros
+    //                                   wo_i.setZero(M, 1);
     Eigen::Matrix<double, Dynamic, 1> w_old; //Array - weight vector (old)
                                       w_old.setZero(M, 1);
     Eigen::Matrix<double, Dynamic, 1> w_new; //Array - weight vector (new)
@@ -103,7 +117,6 @@ int main(int argc, char* argv[])
         {
             x = normaldist(u); // generates normally distributed samples for noise
             u_i(n)  = x;
-            wo_i(n) = wo;
         }
 
         w_old.setZero(M, 1);
@@ -179,6 +192,9 @@ int main(int argc, char* argv[])
 
   for (int nn = 0; nn < nthreads; nn++)
   {
+    MSE_avg_final = MSE_avg_final + ((double) 1/nthreads)*MSE_avg.col(nn);
+    EMSE_avg_final = EMSE_avg_final + ((double) 1/nthreads)*EMSE_avg.col(nn);
+    MSD_avg_final = MSD_avg_final + ((double) 1/nthreads)*MSD_avg.col(nn);
     w_avg_final = w_avg_final + ((double) 1/nthreads)*W_avg.col(nn);
   }
 
@@ -198,15 +214,21 @@ int main(int argc, char* argv[])
   std::cout << "w averaged over realizations = \n" << w_avg_final << std::endl;
 
   // SAVING ==============================================================================
-  std::ofstream output_MSE("./MSE.out"); //file for saving MSE vector
-  std::ofstream output_EMSE("./EMSE.out"); //file for saving EMSE vector
-  std::ofstream output_MSD("./MSD.out"); //file for saving MSD vector
+  std::ofstream output_MSE("./MSE_threads.out"); //file for saving MSE vector
+  std::ofstream output_EMSE("./EMSE_threads.out"); //file for saving EMSE vector
+  std::ofstream output_MSD("./MSD_threads.out"); //file for saving MSD vector
+  std::ofstream output_MSE_final("./MSE.out"); //file for saving MSE vector
+  std::ofstream output_EMSE_final("./EMSE.out"); //file for saving EMSE vector
+  std::ofstream output_MSD_final("./MSD.out"); //file for saving MSD vector
 
   // Saving MSE, EMSE, and MSD
   for(int k = 0; k < iterations; k++){
     output_MSE << MSE_avg.row(k) << "\n";
     output_EMSE << EMSE_avg.row(k) << "\n";
     output_MSD << MSD_avg.row(k) << "\n";
+    output_MSE_final << MSE_avg_final.row(k) << "\n";
+    output_EMSE_final << EMSE_avg_final.row(k) << "\n";
+    output_MSD_final << MSD_avg_final.row(k) << "\n";
   }
 
   std::ofstream output_EMSE_theory("./EMSE_theory.out"); //saving EMSE_theory bound
