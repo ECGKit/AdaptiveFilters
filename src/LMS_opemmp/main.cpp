@@ -11,7 +11,7 @@
 
 #include "timer.h"
 
-#define NUM_THREADS 8
+#define NUM_THREADS 4
 
 //using namespace std;
 using namespace Eigen;
@@ -58,27 +58,27 @@ int main(int argc, char* argv[])
                                     wo_i.setZero(M, 1);
   // Eigen::Matrix<double, Dynamic, 1> w_avg; //Array - weight vector averaged over realizations
   Eigen::Matrix<double, Dynamic, 1> w_avg_final; //Array - weight vector averaged over realizations
+                                    w_avg_final.setZero(M, 1);
   Eigen::Matrix<double, Dynamic, Dynamic> W_avg; //Array - weight vector averaged over realizations
-
-  std::vector<double> MSE_avg;
-  std::vector<double> EMSE_avg;
-  std::vector<double> MSD_avg;
+                                          W_avg.setZero(M, NUM_THREADS);
+  Eigen::Matrix<double, Dynamic, Dynamic> MSE_avg; //MSE_avg
+                                          MSE_avg.setZero(iterations, NUM_THREADS);
+  Eigen::Matrix<double, Dynamic, Dynamic> EMSE_avg; //EMSE_avg
+                                          EMSE_avg.setZero(iterations, NUM_THREADS);
+  Eigen::Matrix<double, Dynamic, Dynamic> MSD_avg; //MSD_avg
+                                          MSD_avg.setZero(iterations, NUM_THREADS);
 
   // Resizing the following vectors to allocate memory. Otherwise
   // a 'segmentation fault'
-  MSE_avg.resize(iterations);
-  EMSE_avg.resize(iterations);
-  MSD_avg.resize(iterations);
-
-  W_avg.setZero(M, NUM_THREADS);
-  w_avg_final.setZero(M, 1);
-
+  // MSE_avg.resize(iterations);
+  // EMSE_avg.resize(iterations);
+  // MSD_avg.resize(iterations);
 
   omp_set_num_threads(NUM_THREADS);
 
   #pragma omp parallel
   {
-    Eigen::Matrix<double, Dynamic, 1> u_i; //Array of regressors initialized with M zeros
+    Eigen::Matrix<double, Dynamic, 1> u_i; //Regressor initialized with M zeros
                                       u_i.setZero(M, 1);
     Eigen::Matrix<double, Dynamic, 1> w_old; //Array - weight vector (old)
                                       w_old.setZero(M, 1);
@@ -115,10 +115,13 @@ int main(int argc, char* argv[])
         w_old.setZero(M, 1);
         w_new.setZero(M, 1);
 
-        // Redefining MSE_galms and EMSE_galms before each realization
-        std::vector<double> MSE;
-        std::vector<double> EMSE;
-        std::vector<double> MSD;
+        // Redefining MSE, EMSE, and MSD before each realization
+        Eigen::Matrix<double, Dynamic, 1> MSE; //MSE
+                                          MSE.setZero(iterations, 1);
+        Eigen::Matrix<double, Dynamic, 1> EMSE; //EMSE
+                                          EMSE.setZero(iterations, 1);
+        Eigen::Matrix<double, Dynamic, 1> MSD; //MSD
+                                          MSD.setZero(iterations, 1);
 
         for (int i = 0; i < iterations; ++i)
         {
@@ -131,9 +134,9 @@ int main(int argc, char* argv[])
           emse = u_i.dot(wo_i - w_old);
           msd = (wo_i - w_old).norm();
 
-  	      MSE.push_back(pow(error,2)); // .push_back shifts the previous content of the vector
-          EMSE.push_back(pow(emse,2)); // .push_back shifts the previous content of the vector
-        	MSD.push_back(pow(msd,2)); // .push_back shifts the previous content of the vector
+  	      MSE(i) = pow(error,2); // Storing the squared error
+          EMSE(i) = pow(emse,2); // Storing the squared excess error
+        	MSD(i) = pow(msd,2); // Storing the squared mean deviation
 
           w_new = w_old + mu*u_i*error;
           w_old = w_new;
@@ -171,16 +174,12 @@ int main(int argc, char* argv[])
           //=========================================================
         } //iterations
 
-        for (int r = 0; r < iterations; ++r)
-        {
-          MSE_avg[r] = MSE_avg[r] + ((double) 1/realizationsPerThrd)*MSE[r];
-          EMSE_avg[r] = EMSE_avg[r] + ((double) 1/realizationsPerThrd)*EMSE[r];
-          MSD_avg[r] = MSD_avg[r] + ((double) 1/realizationsPerThrd)*MSD[r];
-        }
-
+        // Ensemble average for each thread
+        MSE_avg.col(id) += ((double) 1/realizationsPerThrd)*MSE;
+        EMSE_avg.col(id) += ((double) 1/realizationsPerThrd)*EMSE;
+        MSD_avg.col(id) += ((double) 1/realizationsPerThrd)*MSD;
         W_avg.col(id) += ((double) 1/realizationsPerThrd)*w_new;
     } //realizations
-    //W_avg.col(id) = w_avg;
 
   } //pragma omp
 
@@ -205,17 +204,16 @@ int main(int argc, char* argv[])
   std::cout << "w averaged over realizations = \n" << w_avg_final << std::endl;
 
   // SAVING ==============================================================================
-  std::ofstream output_MSE("./MSE.out"); //saving MSE vector
-  std::ostream_iterator<double> output_iterator_MSE(output_MSE, "\n");
-  std::copy(MSE_avg.begin(), MSE_avg.end(), output_iterator_MSE);
+  std::ofstream output_MSE("./MSE.out"); //file for saving MSE vector
+  std::ofstream output_EMSE("./EMSE.out"); //file for saving EMSE vector
+  std::ofstream output_MSD("./MSD.out"); //file for saving MSD vector
 
-  std::ofstream output_EMSE("./EMSE.out"); //saving EMSE vector
-  std::ostream_iterator<double> output_iterator_EMSE(output_EMSE, "\n");
-  std::copy(EMSE_avg.begin(), EMSE_avg.end(), output_iterator_EMSE);
-
-  std::ofstream output_MSD("./MSD.out"); //saving MSD vector
-  std::ostream_iterator<double> output_iterator_MSD(output_MSD, "\n");
-  std::copy(MSD_avg.begin(), MSD_avg.end(), output_iterator_MSD);
+  // Saving MSE, EMSE, and MSD
+  for(int k = 0; k < iterations; k++){
+    output_MSE << MSE_avg.row(k) << "\n";
+    output_EMSE << EMSE_avg.row(k) << "\n";
+    output_MSD << MSD_avg.row(k) << "\n";
+  }
 
   std::ofstream output_EMSE_theory("./EMSE_theory.out"); //saving EMSE_theory bound
   output_EMSE_theory << EMSE_theory << '\n';
