@@ -55,6 +55,7 @@ int main(int argc, char* argv[])
     Eigen::Matrix<double, Dynamic, 1> w_old; //Array - weight vector (old)
     Eigen::Matrix<double, Dynamic, 1> w_new; //Array - weight vector (new)
     Eigen::Matrix<double, Dynamic, 1> w_avg; //Array - weight vector averaged over realizations
+                                      w_avg.setZero(M, 1);
     Eigen::Matrix<double, Dynamic, 1> resource; //Array - resource
 
     std::default_random_engine u;
@@ -84,7 +85,6 @@ for (size_t j = 0; j < realizations; ++j)
 
     w_old.setZero(M, 1);
     w_new.setZero(M, 1);
-    w_avg.setZero(M, 1);
 
     std::cout << "wo_i = \n" << wo_i << std::endl;
 
@@ -107,12 +107,11 @@ for (size_t i = 0; i < iterations; ++i)
         emse = u_i.dot(wo_i - w_old);
         msd = (wo_i - w_old).norm();
 
-	MSE.push_back(pow(error,2)); // .push_back shifts the previous content of the vector
+	      MSE.push_back(pow(error,2)); // .push_back shifts the previous content of the vector
         EMSE.push_back(pow(emse,2)); // .push_back shifts the previous content of the vector
       	MSD.push_back(pow(msd,2)); // .push_back shifts the previous content of the vector
 
         w_new = w_old + mu*u_i*error;
-;
         w_old = w_new;
 
         /*

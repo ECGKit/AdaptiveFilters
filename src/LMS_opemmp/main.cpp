@@ -11,7 +11,7 @@
 
 #include "timer.h"
 
-#define NUM_THREADS 2
+#define NUM_THREADS 8
 
 //using namespace std;
 using namespace Eigen;
@@ -24,11 +24,11 @@ int main(int argc, char* argv[])
   double MSE_theory = 0, EMSE_theory = 0;
   double mu = 5e-3;
   int realizations = 10;
-  int realizationsPerThrd = 10;
+  int realizationsPerThrd = 0;
   int iterations = 1000;
   double var_v = 0;
   int M = 2; //number of taps
-  int nthreads = 1;
+  int nthreads = 0;
 
   std::stringstream str_M(argv[1]);
   str_M >> M;
@@ -53,19 +53,12 @@ int main(int argc, char* argv[])
   double wo{0.55};
 
   //Inititalizing Eigen matrices
-  Eigen::Matrix<double, Dynamic, 1> u_i; //Array of regressors initialized with M zeros
-                                    u_i.setZero(M, 1);
+
   Eigen::Matrix<double, Dynamic, 1> wo_i; //Array - plant model initialized with M zeros
                                     wo_i.setZero(M, 1);
-  Eigen::Matrix<double, Dynamic, 1> w_old; //Array - weight vector (old)
-  Eigen::Matrix<double, Dynamic, 1> w_new; //Array - weight vector (new)
-  Eigen::Matrix<double, Dynamic, 1> w_avg; //Array - weight vector averaged over realizations
+  // Eigen::Matrix<double, Dynamic, 1> w_avg; //Array - weight vector averaged over realizations
   Eigen::Matrix<double, Dynamic, 1> w_avg_final; //Array - weight vector averaged over realizations
   Eigen::Matrix<double, Dynamic, Dynamic> W_avg; //Array - weight vector averaged over realizations
-  Eigen::Matrix<double, Dynamic, 1> resource; //Array - resource
-
-  std::default_random_engine u;
-  std::normal_distribution<double> normaldist(0,1); //Gaussian Distribution, mean=0, stddev=1;
 
   std::vector<double> MSE_avg;
   std::vector<double> EMSE_avg;
@@ -79,10 +72,23 @@ int main(int argc, char* argv[])
 
   W_avg.setZero(M, NUM_THREADS);
   w_avg_final.setZero(M, 1);
+
+
   omp_set_num_threads(NUM_THREADS);
 
   #pragma omp parallel
   {
+    Eigen::Matrix<double, Dynamic, 1> u_i; //Array of regressors initialized with M zeros
+                                      u_i.setZero(M, 1);
+    Eigen::Matrix<double, Dynamic, 1> w_old; //Array - weight vector (old)
+                                      w_old.setZero(M, 1);
+    Eigen::Matrix<double, Dynamic, 1> w_new; //Array - weight vector (new)
+                                      w_new.setZero(M, 1);
+    Eigen::Matrix<double, Dynamic, 1> w_avg; //Array - weight vector averaged over realizations
+                                      w_avg.setZero(M, 1);
+
+    std::default_random_engine u;
+    std::normal_distribution<double> normaldist(0,1); //Gaussian Distribution, mean=0, stddev=1;
 
     int j, id, nthrds;
     id = omp_get_thread_num();
@@ -95,12 +101,9 @@ int main(int argc, char* argv[])
     realizationsPerThrd = realizations/nthrds;
     if (id == 0) nthreads = nthrds; // only executed by the master thread (id = 0)
 
+    //#pragma omp for
     for (j = id; j < realizations; j = j + nthrds)
     {
-
-        // std::cout << "Realization " << j+1
-        //           << " of " << realizations
-        //           << " at thread "<< id << std::endl;
 
         for (int n=0; n < M; n++) //populating the arrays - regressor and noise
         {
@@ -111,9 +114,6 @@ int main(int argc, char* argv[])
 
         w_old.setZero(M, 1);
         w_new.setZero(M, 1);
-        w_avg.setZero(M, 1);
-
-        //std::cout << "wo_i = \n" << wo_i << std::endl;
 
         // Redefining MSE_galms and EMSE_galms before each realization
         std::vector<double> MSE;
@@ -125,8 +125,6 @@ int main(int argc, char* argv[])
           // Desirable output
           v = normaldist(u); // generates normally distributed samples for noise
           d = u_i.dot(wo_i) + sqrt(var_v)*v;
-
-          //y = array_prod(reverse_array(u_i),R[0]);
 
           //GA-LMS
           error = d - u_i.dot(w_old);
@@ -171,7 +169,7 @@ int main(int argc, char* argv[])
           //for (int n = 0; n < M; ++n)
           //std::cerr << u_i[n] << std::endl;
           //=========================================================
-        }
+        } //iterations
 
         for (int r = 0; r < iterations; ++r)
         {
@@ -180,26 +178,22 @@ int main(int argc, char* argv[])
           MSD_avg[r] = MSD_avg[r] + ((double) 1/realizationsPerThrd)*MSD[r];
         }
 
-        //w_new.setOnes(M);
-
-        //w_avg = w_avg + ((double) 1/realizationsPerThrd)*w_new; // averaging estimated w
         W_avg.col(id) += ((double) 1/realizationsPerThrd)*w_new;
-        std::cout << "W_avg.col(id) for each thread = \n" << W_avg.col(id) << std::endl;
     } //realizations
     //W_avg.col(id) = w_avg;
 
   } //pragma omp
 
-  for (int nn = 0; nn < NUM_THREADS; nn++)
+  for (int nn = 0; nn < nthreads; nn++)
   {
-    w_avg_final = w_avg_final + ((double) 1/NUM_THREADS)*W_avg.col(nn);
+    w_avg_final = w_avg_final + ((double) 1/nthreads)*W_avg.col(nn);
   }
-
 
   MSE_theory  = var_v + mu*M*var_v/(2-mu*M);
   EMSE_theory = mu*M*var_v/(2-mu*M);
 
   std::cout << "Number of taps = " << M << std::endl;
+  std::cout << "Number of threads = " << NUM_THREADS << std::endl;
   std::cout << "Realizations = " << realizations << std::endl;
   std::cout << "Realizations per Thread = " << realizationsPerThrd << std::endl;
   std::cout << "Iterations = " << iterations << std::endl;
@@ -229,11 +223,11 @@ int main(int argc, char* argv[])
   std::ofstream output_MSE_theory("./MSE_theory.out"); //saving MSE_theory bound
   output_MSE_theory << MSE_theory << '\n';
 
-  std::ofstream output_w("./w_avg.out"); //saving w_avg array
-  for (int n = 0; n < M; ++n)
-  {
-     output_w << w_avg[n] << '\n'; // saves w_avg. Each line is an entry
-  }
+  // std::ofstream output_w("./w_avg.out"); //saving w_avg array
+  // for (int n = 0; n < M; ++n)
+  // {
+  //    output_w << w_avg[n] << '\n'; // saves w_avg. Each line is an entry
+  // }
 
   printf("Elapsed Time (ms) = %g\n", GetTimer());
 }
