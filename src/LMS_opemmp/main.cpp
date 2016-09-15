@@ -8,10 +8,7 @@
 #include <omp.h> // openmp
 #include "Eigen"
 #include "gnuplot-iostream.h"
-
 #include "timer.h"
-
-#define NUM_THREADS 4
 
 //using namespace std;
 using namespace Eigen;
@@ -29,22 +26,25 @@ int main(int argc, char* argv[])
   double var_v = 0;
   int M = 2; //number of taps
   int nthreads = 0;
+  int NUM_THREADS = 1;
 
-  std::stringstream str_M(argv[1]);
+  std::stringstream str_NUM_THREADS(argv[1]);
+  str_NUM_THREADS >> NUM_THREADS;
+
+  std::stringstream str_M(argv[2]);
   str_M >> M;
 
-  std::stringstream str_realizations(argv[2]);
+  std::stringstream str_realizations(argv[3]);
   str_realizations >> realizations;
 
-  std::stringstream str_iterations(argv[3]);
+  std::stringstream str_iterations(argv[4]);
   str_iterations >> iterations;
 
-  std::stringstream str_mu(argv[4]);
+  std::stringstream str_mu(argv[5]);
   str_mu >> mu;
 
-  std::stringstream str_var_v(argv[5]);
+  std::stringstream str_var_v(argv[6]);
   str_var_v >> var_v;
-
 
   // Initializing variables
   double x{0};
@@ -68,13 +68,7 @@ int main(int argc, char* argv[])
   Eigen::Matrix<double, Dynamic, Dynamic> MSD_avg; //MSD_avg
                                           MSD_avg.setZero(iterations, NUM_THREADS);
 
-  // Resizing the following vectors to allocate memory. Otherwise
-  // a 'segmentation fault'
-  // MSE_avg.resize(iterations);
-  // EMSE_avg.resize(iterations);
-  // MSD_avg.resize(iterations);
-
-  omp_set_num_threads(NUM_THREADS);
+  omp_set_num_threads(NUM_THREADS); //Requesting NUM_THREADS threads to the host
 
   #pragma omp parallel
   {
