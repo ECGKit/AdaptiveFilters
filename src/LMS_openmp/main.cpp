@@ -17,7 +17,7 @@ int main(int argc, char* argv[])
 {
   StartTimer();
 
-  double error, emse, msd;
+
   double MSE_theory = 0, EMSE_theory = 0;
   double mu = 5e-3;
   int realizations = 10;
@@ -46,10 +46,10 @@ int main(int argc, char* argv[])
   std::stringstream str_var_v(argv[6]);
   str_var_v >> var_v;
 
-  // Initializing variables
-  double x{0};
-  double d{0};
-  double v{0};
+  // // Initializing variables
+  // double x{0};
+  // double d{0};
+  // double v{0};
   double wo{0.55};
 
   //Inititalizing Eigen matrices
@@ -84,6 +84,12 @@ int main(int argc, char* argv[])
 
   #pragma omp parallel
   {
+    // Initializing variables
+    double error, emse, msd;
+    double x{0};
+    double d{0};
+    double v{0};
+
     Eigen::Matrix<double, Dynamic, 1> u_i; //Regressor initialized with M zeros
                                       u_i.setZero(M, 1);
     // Eigen::Matrix<double, Dynamic, 1> wo_i; //Array - plant model initialized with M zeros
